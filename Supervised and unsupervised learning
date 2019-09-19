@@ -1,0 +1,125 @@
+%Output parameters for Naive Bayes Classifier
+function param = TrainClassifier(input, label)
+
+[M,~] = size(input);
+train = input;
+
+    sit = [];
+    sta = [];
+    wal = [];
+    jog = [];
+    mar = [];
+    
+    for i = 1:M
+        if label(i) == 1
+            sit = [sit;train(i,:)];
+        elseif label(i) == 2
+            sta = [sta;train(i,:)];
+        elseif label(i) == 3
+            wal = [wal;train(i,:)];
+        elseif label(i) == 4
+            jog = [jog;train(i,:)];
+        else
+            mar = [mar;train(i,:)];
+        end
+    end
+    
+    classes = {sit, sta, wal, jog, mar};
+    n = [length(sit)/M; length(sta)/M; length(wal)/M; length(jog)/M; length(mar)/M];
+    
+    param = cell(5,3);
+    for i = 1:5
+        param(i,1:2) = kmeans(cell2mat(classes(i)));
+        param(i,3) = {n(i)};
+    end    
+end   
+    
+% kmeans clustering 
+
+function parameters = kmeans(input)
+
+k = 2; % Number of clusters
+[M,N] = size(input); % We have M data points & N features
+datapoint = input;
+xMin = floor(min(datapoint,[],1));  % Max and Min values for each feature
+xMax = ceil(max(datapoint,[],1));
+
+% Initialise random clustering centers
+C = zeros(k,N);
+for i = 1:k
+    for j = 1:N
+        %C(i,j) = rand(1) * (xMax(j)-xMin(j)) + xMin(j); % Random attribute method
+        %C(i,j) = xMin(j) + (i-1) * (xMax(j)-xMin(j))/(k-1); % range and
+        %even spread method
+        I = randi([1,M],1);
+        C(i,:) = datapoint(I,:); % Random row method
+    end
+end
+
+
+newE = 0;
+E =10000;
+tol = 5000;
+while abs(E - newE) > tol % until the squared distances is minimised
+    E = newE; % update squared distance
+    P = zeros(M,k); % assignment variable (what we are learning)
+    for i = 1:M    
+        distance = []; % Distance to each cluster centroid
+        for j = 1:k % for each cluster center
+            dist = sum((datapoint(i,:)-C(j,:)).^2);
+            distance = [distance;dist]; 
+        end
+        
+        [~,I] = min(distance); % I is the cluster number to which the data point is assigned
+        P(i,I) = 1;  % Assign each data point to a cluster
+    end
+
+    % Refit clusters
+    C = [];
+    for i = 1:k % for each cluster
+        Refit = []; % store assigned data points
+        for j = 1:M % for each data point
+            [~,I] = max(P(j,:)); % I = cluster number
+            if I == i % if the data point is in the cluster
+                Refit = [Refit;datapoint(j,:)];
+            end
+        end   
+        if isempty(Refit) == 1
+            continue;
+        else
+           Refit_mu = mean(Refit,1); 
+           C(i,:) = Refit_mu; % store updated cluster centroid
+        end
+    end
+
+    
+    % Calculate squared distance for each cluster center
+    newE = zeros(k,1);
+    for j = 1:k 
+        for i = 1:M 
+             d = P(i,j) * sum((datapoint(i,:)' - C(j,:)').^2);
+             newE(j) = newE(j) + d;
+        end
+    end
+end
+
+    % Store inverse covariance matrix of each cluster
+
+    ic = []; % Initialise matrix storing inverse covariance matrix for each cluster
+    for i = 1:k % for each cluster
+        store = [];
+        for j = 1:M % for each data point     should be covariance matrix from all data points in cluster
+            [~,I] = max(P(j,:)); % I = cluster
+            if I == i % if the data point is in the cluster
+                store = [store;datapoint(j,:)]; % store the data points in one cluster
+                size(store);
+            end
+        end
+        if isempty(store) == 1
+            store = zeros(1,64);
+        end
+        ic = cat(3,ic,inv(cov(store)));
+    end
+
+parameters = {C,ic};
+end
